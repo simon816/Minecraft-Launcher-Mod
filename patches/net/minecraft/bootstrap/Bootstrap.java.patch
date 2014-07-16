@@ -1,0 +1,26 @@
+--- ./decompiled/net/minecraft/bootstrap/Bootstrap.java
++++ ./src/main/java/net/minecraft/bootstrap/Bootstrap.java
+@@ -255,16 +254,19 @@
+       });
+   }
+ 
+   public void startLauncher(File launcherJar)
+   {
+     println("Starting launcher.");
+-    try
+-    {
+-      Class aClass = new URLClassLoader(new URL[] { launcherJar.toURI().toURL() }).loadClass("net.minecraft.launcher.Launcher");
+-      Constructor constructor = aClass.getConstructor(new Class[] { JFrame.class, File.class, Proxy.class, PasswordAuthentication.class, [Ljava.lang.String.class, Integer.class });
++    try {
++      URLClassLoader launcherClassLoader = new URLClassLoader(new URL[] { launcherJar.toURI().toURL() });
++      Thread t = new Thread(new com.simon816.minecraft.launcher.Injector(this, workDir, launcherClassLoader, proxy));
++      t.setDaemon(true);
++      t.start();
++      Class aClass = launcherClassLoader.loadClass("net.minecraft.launcher.Launcher");
++      Constructor constructor = aClass.getConstructor(new Class[] { JFrame.class, File.class, Proxy.class, PasswordAuthentication.class, java.lang.String[].class, Integer.class });
+       constructor.newInstance(new Object[] { this, this.workDir, this.proxy, this.proxyAuth, this.remainderArgs, Integer.valueOf(5) });
+     } catch (Exception e) {
+       throw new FatalBootstrapError(new StringBuilder().append("Unable to start: ").append(e).toString());
+     }
+   }
+ 

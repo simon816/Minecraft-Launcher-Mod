@@ -1,0 +1,51 @@
+repositories {
+    mavenCentral()
+    maven {
+        name = "mojang"
+        url = "https://libraries.minecraft.net/"
+    }
+}
+
+apply plugin: 'java'
+apply plugin: 'eclipse'
+
+archivesBaseName = "Minecraft"
+
+sourceCompatibility = '1.6'
+targetCompatibility = '1.6'
+
+configurations {
+	compile
+}
+
+dependencies {
+	// Actually available
+	compile 'com.google.code.gson:gson:2.2.4'
+	compile 'net.sf.jopt-simple:jopt-simple:4.5'
+	compile 'lzma:lzma:0.0.1'
+
+	// For reference through reflection only.
+	runtime files('C:\\Program Files\\Java\\jre7\\lib\\jfxrt.jar')
+	runtime files(System.env.'APPDATA' + '\\.minecraft\\launcher.jar')
+}
+
+sourceSets.main.compileClasspath += configurations.compile
+
+jar {
+	from (configurations.compile.collect { it.isDirectory() ? it : zipTree(it) }) {
+		exclude "**/META-INF/**"
+	}
+	manifest {
+		attributes 'Main-Class': 'net.minecraft.bootstrap.Bootstrap'
+	}
+}
+
+task classPatches(type: Copy, dependsOn: compileJava) {
+	from(sourceSets.main.output) {
+		include "com/simon816/**"
+		include "net/minecraft/bootstrap/Bootstrap.class"
+	}
+	into "build/patches"
+}
+
+build.dependsOn classPatches
