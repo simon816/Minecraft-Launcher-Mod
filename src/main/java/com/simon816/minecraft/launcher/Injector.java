@@ -79,6 +79,7 @@ public class Injector implements Runnable {
             // Add FORGE enum
             VirtualClass MCReleaseType = new VirtualClass(getClass("net.minecraft.launcher.game.MinecraftReleaseType"));
             EnumReflection.addEnum((Class) MCReleaseType.cls(), "FORGE", "forge", "Enable Forge Versions");
+            //TODO: Issue: Race condition error likely when active profile is forge. (Temporarily change selectedProfile?)
 
             // Add to lookup table
             MCReleaseType.getStatic("LOOKUP", Map.class).put("forge", Enum.valueOf((Class) MCReleaseType.cls(), "FORGE"));

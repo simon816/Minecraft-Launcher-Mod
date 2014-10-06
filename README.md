@@ -3,9 +3,23 @@ Minecraft Launcher Modification
 
 This 'hack' allows the vanilla launcher to be modified by a single patch to the main class.
 
-It is really an experiment to play about with reflection among others but I will use this as my launcher to Minecraft.
+It is really an experiment to play about with reflection among others but I use this as my launcher to Minecraft.
 
-How to use
+Features
+--------
+* Select Minecraft Forge builds direct in the launcher's profile selector
+![Profile Editor](http://puu.sh/c1Tgu/4f0ae3b022.png)  
+You can check the "Enable Forge Versions" checkbox to get a list.  
+It also provides a checkbox for standard vanilla releases to be toggled.
+
+* Can download and play _almost_ any forge version. Forge has changed a lot, especially in how it is installed.
+Depending on what version you select, ModLoader may be downloaded or various other install procedures take place.   
+
+* See the mods you have in the mods folder. This is a very basic feature that may be improved.
+![Mod Tab](http://puu.sh/c1TmG/faed6b5cac.png)
+
+
+Developing
 ----------
 #### Prerequisites
  * Eclipse

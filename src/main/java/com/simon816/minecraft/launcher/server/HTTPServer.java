@@ -1,18 +1,28 @@
 package com.simon816.minecraft.launcher.server;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.math.BigInteger;
 import java.net.HttpURLConnection;
 import java.net.InetSocketAddress;
 import java.net.Proxy;
-import java.net.URI;
 import java.net.URL;
+import java.security.DigestOutputStream;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map.Entry;
+import java.util.jar.JarEntry;
+import java.util.jar.JarInputStream;
+import java.util.jar.JarOutputStream;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipException;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -30,8 +40,9 @@ public class HTTPServer {
     private static String mcBaseUrl;
     private static VirtualClass httpClass;
     private static Proxy proxy;
-    private static Pattern forgeVerId = Pattern.compile("(\\d\\.\\d\\.\\d+)-Forge(\\d+\\.\\d+\\.\\d+\\.\\d+)");
-    private static Pattern forgeJar = Pattern.compile("(forge-(\\d\\.\\d\\.\\d+)-(\\d+\\.\\d+\\.\\d+\\.\\d+))\\.jar");
+    private static Pattern forgeVerId = Pattern.compile("(\\d\\.\\d(?:\\.\\d+)?)-Forge(\\d+\\.\\d+\\.\\d+\\.\\d+)");
+    private static Pattern forgeJar = Pattern.compile("(forge-(\\d\\.\\d(?:\\.\\d+)?)-(\\d+\\.\\d+\\.\\d+\\.\\d+))\\.jar");
+    private static Hashtable<String, String> eTags = new Hashtable<String, String>();
 
     public HTTPServer(VirtualClass httpClass, Proxy proxy) {
         HTTPServer.httpClass = httpClass;
@@ -44,7 +55,7 @@ public class HTTPServer {
     public static void main(String[] args) {
         HTTPServer server = new HTTPServer(null, Proxy.NO_PROXY);
         server.setMCBaseUrl("http://s3.amazonaws.com/Minecraft.Download/");
-        server.start();
+        System.out.println(server.start());
     }
 
     public String start() {
@@ -160,31 +171,46 @@ public class HTTPServer {
 
         @Override
         public void handle(HttpExchange client) throws IOException {
-            URI uri = client.getRequestURI();
+            try {
+                handleRequest(client);
+            } catch (IOException e) {
+                e.printStackTrace();
+                throw e;
+            } catch (Throwable t) {
+                t.printStackTrace();
+            }
+        }
+
+        public void handleRequest(HttpExchange client) throws IOException {
+            String uri = client.getRequestURI().toString();
             System.out.println("PROXY REQUEST: " + uri);
-            if (uri.toString().equals("/versions/versions.json")) {
+            if (uri.equals("/versions/versions.json")) {
                 sendString(client, listVersions());
                 return;
             }
-            if (uri.toString().startsWith("/versions/")) {
-                String[] verParts = uri.toString().substring(1).split("/");
+            if (uri.startsWith("/versions/")) {
+                String[] verParts = uri.substring(1).split("/");
                 Matcher match = forgeVerId.matcher(verParts[1]);
                 String[] filename = splitFilename(verParts[2]);
                 Matcher match2 = forgeVerId.matcher(filename[0]);
                 if (match.matches() && match2.matches()) {
                     String mcVer = match.group(1);
                     String forgeVer = match.group(2);
+                    int forgeBuild = Integer.parseInt(forgeVer.substring(forgeVer.lastIndexOf('.') + 1));
                     if (filename[1].equals("json")) {
-                        sendString(client, forgeJson(mcVer, forgeVer));
+                        sendString(client, forgeJson(mcVer, forgeVer, verParts[1], forgeBuild));
                         return;
                     } else if (filename[1].equals("jar")) {
-                        mirrorURI(client, "versions/" + mcVer + "/" + mcVer + ".jar");
+                        if (forgeBuild > 738)
+                            mirrorURI(client, "versions/" + mcVer + "/" + mcVer + ".jar");
+                        else
+                            buildOldJar(client, mcVer, forgeVer, forgeBuild);
                         return;
                     }
                 }
             }
-            if (uri.toString().startsWith("/forgelib/")) {
-                String path = uri.toString().substring("/forgelib/".length());
+            if (uri.startsWith("/forgelib/")) {
+                String path = uri.substring("/forgelib/".length());
                 if (path.startsWith("net/minecraftforge")) {
                     String[] parts = path.split("/");
                     Matcher match = forgeJar.matcher(parts[parts.length - 1]);
@@ -199,17 +225,156 @@ public class HTTPServer {
         }
     }
 
-    private static String forgeJson(String mcVer, String forgeVer) throws IOException {
-        JsonObject json = new JsonParser().parse(ForgeVersions.getJsonFor(mcVer, forgeVer)).getAsJsonObject();
+    private static String forgeJson(String mcVer, String forgeVer, String versionID, int forgeBuild) throws IOException {
+        String jsonText;
+        try {
+            jsonText = ForgeVersions.getJsonFor(mcVer, forgeVer);
+        } catch (UnsupportedOperationException e) {
+            jsonText = httpGet(mcBaseUrl + "versions/" + mcVer + "/" + mcVer + ".json");
+            System.out.println("Old forge");
+        }
+        JsonObject json = new JsonParser().parse(jsonText).getAsJsonObject();
+        json.addProperty("type", "forge");
+        json.addProperty("id", versionID);
+        if (forgeBuild < 110) {
+            // ModLoader not compatible with launcher-wrapper
+            json.addProperty("mainClass", "net.minecraft.client.Minecraft");
+        }
         Iterator<JsonElement> it = json.get("libraries").getAsJsonArray().iterator();
         while (it.hasNext()) {
             JsonObject library = it.next().getAsJsonObject();
+            if (forgeBuild < 110 && library.get("name").getAsString().startsWith("net.minecraft:launchwrapper")) {
+                it.remove();
+                continue;
+            }
             if (library.has("url")) {
                 if (library.get("url").getAsString().startsWith("http://files.minecraftforge.net")) {
                     library.addProperty("url", "http://" + address + "/forgelib/");
+                    if (library.get("name").getAsString().startsWith("net.minecraftforge:minecraftforge:"))
+                        library.addProperty("name", "net.minecraftforge:forge:" + mcVer + "-" + forgeVer);
                 }
             }
         }
         return json.toString();
+    }
+
+    private static void buildOldJar(HttpExchange req, String mcVer, String forgeVer, int forgeBuild) throws IOException {
+        if (eTags.containsKey(forgeVer) && eTags.get(forgeVer).equals(req.getRequestHeaders().getFirst("If-None-Match"))) {
+            req.sendResponseHeaders(304, -1);
+            System.out.println("ETag match");
+            return;
+        }
+        if (req.getRequestHeaders().containsKey("If-None-Match")) {
+            req.sendResponseHeaders(304, -1);
+            System.out.println("FAKE ETag match");
+            return;
+        }
+        HttpURLConnection con1 = (HttpURLConnection) new URL(mcBaseUrl + "versions/" + mcVer + "/" + mcVer + ".jar").openConnection();
+        HttpURLConnection con2 = (HttpURLConnection) new URL("http://files.minecraftforge.net/maven/net/minecraftforge/forge/" + mcVer + "-" + forgeVer + "/forge-" + mcVer + "-" + forgeVer + "-"
+                + (forgeBuild > 182 ? "universal" : "client") + ".zip").openConnection();
+        if (con1.getResponseCode() / 100 != 2) {
+            req.sendResponseHeaders(con1.getResponseCode(), 0);
+            return;
+        }
+        if (con2.getResponseCode() / 100 != 2) {
+            req.sendResponseHeaders(con2.getResponseCode(), 0);
+            return;
+        }
+        HttpURLConnection con3 = null;
+        if (forgeBuild < 110) {
+            con3 = (HttpURLConnection) new URL("https://dl.dropboxusercontent.com/u/20629262/" + mcVer + "/ModLoader.zip").openConnection();
+            if (con3.getResponseCode() / 100 != 2) {
+                req.sendResponseHeaders(con3.getResponseCode(), 0);
+                return;
+            }
+        }
+
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        JarOutputStream rebuilt = new JarOutputStream(baos);
+
+        JarInputStream jar = new JarInputStream(con2.getInputStream());
+        ZipEntry entry;
+        while ((entry = jar.getNextEntry()) != null) {
+            JarEntry newEntry = new JarEntry(entry.getName());
+            newEntry.setTime(entry.getTime());
+            newEntry.setExtra(entry.getExtra());
+            rebuilt.putNextEntry(newEntry);
+            byte[] buff = new byte[1024];
+            int l;
+            while ((l = jar.read(buff)) > 0) {
+                rebuilt.write(buff, 0, l);
+            }
+            rebuilt.closeEntry();
+        }
+        jar.close();
+        con2.disconnect();
+
+        if (con3 != null) {
+            jar = new JarInputStream(con3.getInputStream());
+            while ((entry = jar.getNextEntry()) != null) {
+                try {
+                    JarEntry newEntry = new JarEntry(entry.getName());
+                    newEntry.setTime(entry.getTime());
+                    newEntry.setExtra(entry.getExtra());
+                    rebuilt.putNextEntry(newEntry);
+                    byte[] buff = new byte[1024];
+                    int l;
+                    while ((l = jar.read(buff)) > 0) {
+                        rebuilt.write(buff, 0, l);
+                    }
+                    rebuilt.closeEntry();
+                } catch (ZipException e) {
+                    if (e.getMessage().startsWith("duplicate"))
+                        continue;
+                    e.printStackTrace();
+                }
+            }
+            jar.close();
+            con3.disconnect();
+        }
+
+        jar = new JarInputStream(con1.getInputStream());
+        while ((entry = jar.getNextEntry()) != null) {
+            if (entry.getName().startsWith("META-INF/") || entry.getName().startsWith("/META-INF/"))
+                continue; // Skip META-INF
+            try {
+                JarEntry newEntry = new JarEntry(entry.getName());
+                newEntry.setTime(entry.getTime());
+                newEntry.setExtra(entry.getExtra());
+                rebuilt.putNextEntry(newEntry);
+                byte[] buff = new byte[1024];
+                int l;
+                while ((l = jar.read(buff)) > 0) {
+                    rebuilt.write(buff, 0, l);
+                }
+                rebuilt.closeEntry();
+            } catch (ZipException e) {
+                if (e.getMessage().startsWith("duplicate"))
+                    continue;
+                e.printStackTrace();
+            }
+        }
+        jar.close();
+        con1.disconnect();
+
+        rebuilt.close();
+        byte[] jarBytes = baos.toByteArray();
+        try {
+            DigestOutputStream digOs = new DigestOutputStream(baos, MessageDigest.getInstance("MD5"));
+            digOs.write(jarBytes);
+            String md5 = String.format("%1$032x", new Object[] { new BigInteger(1, digOs.getMessageDigest().digest()) });
+            digOs.close();
+            req.getResponseHeaders().add("ETag", "\"" + md5 + "\"");
+            eTags.put(forgeVer, md5);
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        }
+        if (req.getRequestMethod().equals("HEAD")) {
+            System.out.println("Head request");
+            req.sendResponseHeaders(200, -1);
+        } else {
+            req.sendResponseHeaders(200, baos.size());
+            req.getResponseBody().write(jarBytes);
+        }
     }
 }

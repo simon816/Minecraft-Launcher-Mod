@@ -31,7 +31,6 @@ class Util {
     private static void closeField() {
         if (!wasAccessible)
             fValue.setAccessible(wasAccessible);
-
     }
 
     static void setFieldValue(Class<?> hostClass, Object hostObject, String name, Object value) throws ReflectiveOperationException {
