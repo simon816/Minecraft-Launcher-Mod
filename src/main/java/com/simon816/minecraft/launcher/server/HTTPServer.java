@@ -55,7 +55,7 @@ public class HTTPServer {
     public static void main(String[] args) {
         HTTPServer server = new HTTPServer(null, Proxy.NO_PROXY);
         server.setMCBaseUrl("http://s3.amazonaws.com/Minecraft.Download/");
-        System.out.println(server.start());
+        server.start();
     }
 
     public String start() {

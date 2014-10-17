@@ -42,6 +42,8 @@ public class ForgeVersions {
                 private boolean acceptText = false;
                 private String forgeVer;
                 private boolean isLater = false;
+                private boolean promotionDiv;
+                private boolean promotionTable;
 
                 private boolean isTag(Tag a, Tag b) {
                     return a.toString().equals(b.toString());
@@ -50,29 +52,39 @@ public class ForgeVersions {
                 @Override
                 public void handleStartTag(Tag tag, MutableAttributeSet attr, int pos) {
 
-                    if (isTag(tag, Tag.DIV) && "builds".equals(attr.getAttribute(Attribute.CLASS))) {
-                        buildsDiv = true;
-                        return;
+                    if (isTag(tag, Tag.DIV)) {
+                        if ("builds".equals(attr.getAttribute(Attribute.CLASS))) {
+                            buildsDiv = true;
+                            return;
+                        } else if ("promotions".equals(attr.getAttribute(Attribute.ID))) {
+                            promotionDiv = true;
+                            return;
+                        }
                     }
-                    if (!buildsDiv)
+                    if (!buildsDiv && !promotionDiv)
                         return;
                     if (isTag(tag, Tag.TABLE)) {
-                        buildsTable = true;
+                        if (buildsDiv)
+                            buildsTable = true;
+                        else
+                            promotionTable = true;
                         tableRow = 0;
                         return;
                     }
-                    if (!buildsTable)
+                    if (!buildsTable && !promotionTable)
                         return;
                     if (isTag(tag, Tag.TR)) {
                         tableRow++;
-                        entry = new JsonObject();
                         rowColumn = 0;
+                        if (tableRow == 1) // Header row
+                            return;
+                        entry = new JsonObject();
                     }
-                    if (tableRow == 1) // Header row
-                        return;
                     if (isTag(tag, Tag.TD)) {
                         rowColumn++;
-                        if (rowColumn > 3) // Only want first 3 columns
+                        if (buildsTable && rowColumn > 3) // Only want first 3 columns
+                            acceptText = false;
+                        else if (promotionTable && (rowColumn == 0 || rowColumn > 4)) // Columns 1 - 4
                             acceptText = false;
                         else
                             acceptText = true;
@@ -81,15 +93,21 @@ public class ForgeVersions {
 
                 @Override
                 public void handleEndTag(Tag tag, int pos) {
-                    if (buildsDiv) {
+                    if (buildsDiv || promotionDiv) {
                         if (isTag(tag, Tag.TD))
                             acceptText = false;
                         else if (isTag(tag, Tag.TR))
                             finishEntry();
-                        else if (isTag(tag, Tag.TABLE))
-                            buildsTable = false;
-                        else if (isTag(tag, Tag.DIV))
-                            buildsDiv = false;
+                        else if (isTag(tag, Tag.TABLE)) {
+                            if (buildsTable)
+                                buildsTable = false;
+                            else if (promotionTable)
+                                promotionTable = false;
+                        } else if (isTag(tag, Tag.DIV))
+                            if (buildsDiv)
+                                buildsDiv = false;
+                            else if (promotionDiv)
+                                promotionDiv = false;
                         return;
                     }
                 }
@@ -98,7 +116,10 @@ public class ForgeVersions {
                     if (entry != null && entry.has("id")) {
                         if (isLater)
                             latestId = entry.get("id").getAsString();
-                        entry.addProperty("type", "forge");
+                        if (buildsTable)
+                            entry.addProperty("type", "forge");
+                        else if (promotionTable)
+                            entry.addProperty("type", "forge_recommended");
                         array.add(entry);
                         entry = null;
                     }
@@ -109,11 +130,11 @@ public class ForgeVersions {
                     if (!acceptText)
                         return;
                     String text = new String(data).trim();
-                    if (rowColumn == 1)
+                    if ((buildsTable && rowColumn == 1) || (promotionTable && rowColumn == 2))
                         addForgeVer(text);
-                    else if (rowColumn == 2)
+                    else if ((buildsTable && rowColumn == 2) || (promotionTable && rowColumn == 3))
                         addMcVer(text);
-                    else if (rowColumn == 3)
+                    else if ((buildsTable && rowColumn == 3) || (promotionTable && rowColumn == 4))
                         addTime(text);
                 }
 
