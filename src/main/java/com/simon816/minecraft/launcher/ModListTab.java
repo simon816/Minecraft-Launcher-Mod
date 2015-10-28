@@ -56,7 +56,7 @@ public class ModListTab extends JScrollPane {
             File modsDir = new File(wd, "mods");
 
             for (File file : modsDir.listFiles()) {
-                if (file.isDirectory() && file.getName().matches("(\\d\\.){2}\\d")) {
+                if (file.isDirectory() && file.getName().matches("(\\d\\.){1,}\\d")) {
                     for (File mFile : file.listFiles()) {
                         addModFile(file.getName(), mFile);
                     }

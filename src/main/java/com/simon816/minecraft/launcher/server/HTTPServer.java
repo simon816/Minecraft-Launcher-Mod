@@ -50,7 +50,8 @@ public class HTTPServer {
     }
 
     /**
-     * Test the server standalone. Do NOT access /versions/versions.json there will be a NPE!
+     * Test the server standalone. Do NOT access /versions/versions.json there
+     * will be a NPE!
      */
     public static void main(String[] args) {
         HTTPServer server = new HTTPServer(null, Proxy.NO_PROXY);
@@ -93,11 +94,15 @@ public class HTTPServer {
     private static String listVersions() throws IOException {
         JsonObject json = new JsonParser().parse(httpGet(mcBaseUrl + "versions/versions.json")).getAsJsonObject();
         JsonArray versions = json.getAsJsonArray("versions");
-        JsonArray forgeVersions = ForgeVersions.getVersions(httpGet("http://files.minecraftforge.net/"));
+        // http://files.minecraftforge.net/maven/net/minecraftforge/forge/promotions_slim.json
+        JsonArray forgeVersions = ForgeVersions.getVersions(httpGet("http://files.minecraftforge.net/maven/net/minecraftforge/forge/json"));
         forgeVersions.addAll(versions);
         json.add("versions", forgeVersions);
         if (ForgeVersions.latestId != null) {
             json.getAsJsonObject("latest").addProperty("forge", ForgeVersions.latestId);
+        }
+        if (ForgeVersions.latestRecommendedId != null) {
+            json.getAsJsonObject("latest").addProperty("forge_recommended", ForgeVersions.latestRecommendedId);
         }
         return json.toString();
     }
@@ -115,6 +120,9 @@ public class HTTPServer {
         try {
             HttpURLConnection con = (HttpURLConnection) new URL(url).openConnection(proxy);
             for (Entry<String, List<String>> header : req.getRequestHeaders().entrySet()) {
+                if (header.getKey().equals("Host")) {
+                    continue;
+                }
                 for (String value : header.getValue()) {
                     con.addRequestProperty(header.getKey(), value);
                 }
@@ -270,8 +278,8 @@ public class HTTPServer {
             return;
         }
         HttpURLConnection con1 = (HttpURLConnection) new URL(mcBaseUrl + "versions/" + mcVer + "/" + mcVer + ".jar").openConnection();
-        HttpURLConnection con2 = (HttpURLConnection) new URL("http://files.minecraftforge.net/maven/net/minecraftforge/forge/" + mcVer + "-" + forgeVer + "/forge-" + mcVer + "-" + forgeVer + "-"
-                + (forgeBuild > 182 ? "universal" : "client") + ".zip").openConnection();
+        HttpURLConnection con2 = (HttpURLConnection) new URL("http://files.minecraftforge.net/maven/net/minecraftforge/forge/" + mcVer + "-" + forgeVer
+                + "/forge-" + mcVer + "-" + forgeVer + "-" + (forgeBuild > 182 ? "universal" : "client") + ".zip").openConnection();
         if (con1.getResponseCode() / 100 != 2) {
             req.sendResponseHeaders(con1.getResponseCode(), 0);
             return;

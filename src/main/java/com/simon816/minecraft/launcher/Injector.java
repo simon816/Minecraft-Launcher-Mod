@@ -3,6 +3,7 @@ package com.simon816.minecraft.launcher;
 import java.awt.Component;
 import java.io.File;
 import java.net.Proxy;
+import java.net.URLClassLoader;
 import java.util.Map;
 
 import javax.swing.JPanel;
@@ -23,7 +24,14 @@ public class Injector implements Runnable {
     private HTTPServer server;
     private String serverAddress;
 
-    public Injector(Bootstrap bootstrap, File workDir, ClassLoader launcherClassLoader, Proxy proxy) {
+
+    public static void start(Bootstrap bootstrap, File workDir, URLClassLoader launcherClassLoader, Proxy proxy) {
+        Thread t = new Thread(new Injector(bootstrap, workDir, launcherClassLoader, proxy));
+        t.setDaemon(true);
+        t.start();
+    }
+
+    private Injector(Bootstrap bootstrap, File workDir, ClassLoader launcherClassLoader, Proxy proxy) {
         this.bootstrap = bootstrap;
         this.workDir = workDir;
         Injector.launcherClassLoader = launcherClassLoader;
@@ -51,7 +59,7 @@ public class Injector implements Runnable {
                 }
             }
             try {
-                Thread.sleep(100);
+                Thread.sleep(10);
             } catch (InterruptedException e) {
                 e.printStackTrace();
                 break;
