@@ -30,7 +30,7 @@ public class ForgeVersions {
     public static String latestRecommendedId = null;
     private static Hashtable<String, String> versionCache = new Hashtable<String, String>();
 
-    public static JsonArray getVersions(String jsonString) {
+    public static JsonArray getVersions(String jsonString, String proxyUrl) {
         final JsonArray array = new JsonArray();
         JsonObject json = new JsonParser().parse(jsonString).getAsJsonObject();
         JsonObject allBuilds = json.get("number").getAsJsonObject();
@@ -44,7 +44,11 @@ public class ForgeVersions {
 
         for (Entry<String, JsonElement> buildEntry : allBuilds.entrySet()) {
             JsonObject build = buildEntry.getValue().getAsJsonObject();
-            String id = build.get("mcversion").getAsString() + "-Forge" + build.get("version").getAsString();
+            JsonElement mcversion = build.get("mcversion");
+            if (mcversion.isJsonNull()) {
+                continue;
+            }
+            String id = mcversion.getAsString() + "-Forge" + build.get("version").getAsString();
             Date time = new Date(build.get("modified").getAsLong() * 1000);
             if (time.after(latestDate)) {
                 latestDate = time;
@@ -55,6 +59,7 @@ public class ForgeVersions {
             version.addProperty("time", MC_DATE_FORMAT.format(time));
             version.add("releaseTime", version.get("time"));
             version.addProperty("type", "forge");
+            version.addProperty("url", "http://" + proxyUrl + "/versions/" + id + "/" + id + ".json");
             array.add(version);
             if (recommendedBuilds.contains((Integer) build.get("build").getAsInt())) {
                 if (time.after(latestRecommendedDate)) {
@@ -66,6 +71,7 @@ public class ForgeVersions {
                 version.addProperty("time", MC_DATE_FORMAT.format(time));
                 version.add("releaseTime", version.get("time"));
                 version.addProperty("type", "forge_recommended");
+                version.addProperty("url", "http://" + proxyUrl + "/versions/" + id + "/" + id + ".json");
                 array.add(version);
             }
         }

@@ -92,10 +92,10 @@ public class HTTPServer {
     }
 
     private static String listVersions() throws IOException {
-        JsonObject json = new JsonParser().parse(httpGet(mcBaseUrl + "versions/versions.json")).getAsJsonObject();
+        JsonObject json = new JsonParser().parse(httpGet("https://launchermeta.mojang.com/mc/game/version_manifest.json")).getAsJsonObject();
         JsonArray versions = json.getAsJsonArray("versions");
         // http://files.minecraftforge.net/maven/net/minecraftforge/forge/promotions_slim.json
-        JsonArray forgeVersions = ForgeVersions.getVersions(httpGet("http://files.minecraftforge.net/maven/net/minecraftforge/forge/json"));
+        JsonArray forgeVersions = ForgeVersions.getVersions(httpGet("http://files.minecraftforge.net/maven/net/minecraftforge/forge/json"), address);
         forgeVersions.addAll(versions);
         json.add("versions", forgeVersions);
         if (ForgeVersions.latestId != null) {

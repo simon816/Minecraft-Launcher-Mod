@@ -2,8 +2,11 @@ package com.simon816.minecraft.launcher;
 
 import java.awt.Component;
 import java.io.File;
+import java.net.MalformedURLException;
 import java.net.Proxy;
+import java.net.URL;
 import java.net.URLClassLoader;
+import java.util.Arrays;
 import java.util.Map;
 
 import javax.swing.JPanel;
@@ -105,8 +108,12 @@ public class Injector implements Runnable {
             new VirtualObject(Enum.valueOf((Class) MCReleaseType.cls(), "RELEASE")).set("description", "Enable Standard Releases");
 
             if (server != null) {
-                server.setMCBaseUrl(remoteVersionList.get("baseUrl", String.class));
-                remoteVersionList.set("baseUrl", "http://" + serverAddress + "/");
+                server.setMCBaseUrl("https://s3.amazonaws.com/Minecraft.Download/");
+                try {
+                    remoteVersionList.set("manifestUrl", new URL("http://" + serverAddress + "/versions/versions.json"));
+                } catch (MalformedURLException e) {
+                    e.printStackTrace();
+                }
             }
             return true;
         } catch (ReflectiveOperationException e) {
