@@ -4,6 +4,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.lang.reflect.InvocationTargetException;
 import java.math.BigInteger;
 import java.net.HttpURLConnection;
 import java.net.InetSocketAddress;
@@ -40,8 +41,9 @@ public class HTTPServer {
     private static String mcBaseUrl;
     private static VirtualClass httpClass;
     private static Proxy proxy;
-    private static Pattern forgeVerId = Pattern.compile("(\\d\\.\\d(?:\\.\\d+)?)-Forge(\\d+\\.\\d+\\.\\d+\\.\\d+)");
-    private static Pattern forgeJar = Pattern.compile("(forge-(\\d\\.\\d(?:\\.\\d+)?)-(\\d+\\.\\d+\\.\\d+\\.\\d+))\\.jar");
+    private static final String MC_VER_REGEX = "\\d\\.\\d+(?:\\.\\d+)?";
+    private static Pattern forgeVerId = Pattern.compile("(" + MC_VER_REGEX + ")-Forge(\\d+\\.\\d+\\.\\d+\\.\\d+)");
+    private static Pattern forgeJar = Pattern.compile("(forge-(" + MC_VER_REGEX + ")-(\\d+\\.\\d+\\.\\d+\\.\\d+))\\.jar");
     private static Hashtable<String, String> eTags = new Hashtable<String, String>();
 
     public HTTPServer(VirtualClass httpClass, Proxy proxy) {
@@ -84,9 +86,15 @@ public class HTTPServer {
 
     private static String httpGet(String url) throws IOException {
         try {
-            return httpClass.callStatic("performGet", String.class, new URL(url), proxy);
-        } catch (Exception e) {
-            e.printStackTrace();
+            try {
+                return httpClass.callStatic("performGet", String.class, new URL(url), proxy);
+            } catch (InvocationTargetException e) {
+                throw e.getCause();
+            }
+        } catch (IOException e) {
+            throw e;
+        } catch (Throwable t) {
+            t.printStackTrace();
         }
         return "";
     }

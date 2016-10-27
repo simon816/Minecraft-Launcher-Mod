@@ -25,7 +25,7 @@ dependencies {
 	compile 'lzma:lzma:0.0.1'
 
 	// For reference through reflection only.
-	runtime files(System.env.'JAVA_HOME' + '\\jre\\lib\\jfxrt.jar')
+	runtime files(System.env.'JAVA_HOME' + '\\jre\\lib\\ext\\jfxrt.jar')
 	runtime files(System.env.'APPDATA' + '\\.minecraft\\launcher.jar')
 }
 
