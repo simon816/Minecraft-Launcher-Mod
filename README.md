@@ -8,7 +8,7 @@ It is really an experiment to play about with reflection among others but I use 
 Features
 --------
 * Select Minecraft Forge builds direct in the launcher's profile selector
-![Profile Editor](http://puu.sh/c1Tgu/4f0ae3b022.png)  
+![Profile Editor](https://raw.githubusercontent.com/simon816/Minecraft-Launcher-Mod/master/images/profile_editor.png)  
 You can check the "Enable Forge Versions" checkbox to get a list.  
 It also provides a checkbox for standard vanilla releases to be toggled.
 
@@ -16,7 +16,7 @@ It also provides a checkbox for standard vanilla releases to be toggled.
 Depending on what version you select, ModLoader may be downloaded or various other install procedures take place.   
 
 * See the mods you have in the mods folder. This is a very basic feature that may be improved.
-![Mod Tab](http://puu.sh/c1TmG/faed6b5cac.png)
+![Mod Tab](https://raw.githubusercontent.com/simon816/Minecraft-Launcher-Mod/master/images/mod_tab.png)
 
 
 Developing
